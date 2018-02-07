@@ -1,37 +1,37 @@
+from decimal import Decimal as D
+
 import random
 
 
 class Exchange:
-    def redeem(self, num_ntl):
+
+    @classmethod
+    def get_flat_price(cls, token_name):
+        return 1
+
+    @classmethod
+    def get_ntl_min_price(cls, token_name):
+        return 1
+
+    @classmethod
+    def redeem(cls, num_ntl, token_name):
         """
         return token.
         """
-        pass
+        num_redeemed = D(0)
+        return num_redeemed
 
-
-    def buy(self, num_token, token):
+    @classmethod
+    def buy(cls, num_token, token):
         """
         To buy given number of NTL buy token.
         Return num_amount of ntl if succeed, None if failed
         :param num_token: 10
         :param token: for example EOS
         """
-        return 1000
+        num_bought = D('1000')
+        return num_bought
 
-
-    def get_tokens(self, num_token, token):
-        pass
-
-
-"""
-EOS: 2
-OMG: 1
-NTL: 2 EOS, 1 OMG
-EOS / OMG = 2
-EOS / NTL = 1/2
-OMG / NTL = 1
-EOS_NTL / OMG_NTL = 1/2
-"""
 
 class Trader:
     """
@@ -52,19 +52,13 @@ class Trader:
 
     @staticmethod
     def get_premium_rate():
-        return random.randint(1, 100) / 100.0
-
-    def get_flat_price(self, token_name):
-        return 1
-
-    def get_ntl_min_price(self, token_name):
-        return 1
+        return D(random.randint(1, 100)) / D('100')
 
     def get_ntl_relative_price(
             self, source_token_name, target_token_name, premium_rate=None
     ):
-        source_ntl_price = self.get_ntl_min_price(source_token_name)
-        target_ntl_price = self.get_ntl_min_price(target_token_name)
+        source_ntl_price = Exchange.get_ntl_min_price(source_token_name)
+        target_ntl_price = Exchange.get_ntl_min_price(target_token_name)
         if premium_rate is not None:
             target_ntl_price = self.get_price_with_impact_cost(
                 target_ntl_price, premium_rate=premium_rate
@@ -78,8 +72,8 @@ class Trader:
         :param target_token_name:
         :return:
         """
-        source_market_price = self.get_flat_price(source_token_name)
-        target_market_price = self.get_flat_price(target_token_name)
+        source_market_price = Exchange.get_flat_price(source_token_name)
+        target_market_price = Exchange.get_flat_price(target_token_name)
         return target_market_price / source_market_price
 
     def should_convert2target(self, source_token, target_token, premium_rate=None):
@@ -92,10 +86,4 @@ class Trader:
         return False
 
     def do_transition(self, token_name, num_token, num_ntl):
-        pass
-
-    def sell(self):
-        pass
-
-    def assets(self):
-        pass
+        Exchange.buy()

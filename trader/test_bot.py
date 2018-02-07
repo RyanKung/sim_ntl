@@ -22,6 +22,7 @@ def test_should_redeem_target_token(
         eos_flat, eos_ntl, omg_flat, omg_ntl, premium_rate, result,
 ):
     trader = bot.Trader()
+    exchange = bot.Exchange
 
     def get_flat_price(token_name):
         if token_name == 'eos':
@@ -35,8 +36,8 @@ def test_should_redeem_target_token(
         else:
             return omg_ntl
 
-    with mock.patch.object(trader, 'get_flat_price', get_flat_price), \
-         mock.patch.object(trader, 'get_ntl_min_price', get_ntl_price):
+    with mock.patch.object(exchange, 'get_flat_price', get_flat_price), \
+         mock.patch.object(exchange, 'get_ntl_min_price', get_ntl_price):
         assert trader.should_convert2target(
             'eos', 'omg', premium_rate=premium_rate
         ) is result
