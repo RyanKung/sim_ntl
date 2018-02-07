@@ -3,6 +3,11 @@ from decimal import Decimal as D
 import random
 
 
+EOS = 'eos'
+OMG = 'omg'
+NTL = 'ntl'
+
+
 class Exchange:
 
     @classmethod
@@ -40,9 +45,9 @@ class Trader:
 
     def __init__(self, premium_rate=0.05):
         self.assets = {
-            'eos': 0,
-            'omg': 0,
-            'ntl': 0,
+            EOS: D('1000') * D('10'),
+            OMG: D('1000') * D('10'),
+            NTL: D('0'),
         }
         self.premium_rate = premium_rate
 
@@ -85,5 +90,31 @@ class Trader:
             return True
         return False
 
-    def do_transition(self, token_name, num_token, num_ntl):
-        Exchange.buy()
+    def one_cycle(self):
+        """
+        Should be run each round.
+        :return:
+        """
+        premium_rate = self.get_premium_rate()
+        if self.should_convert2target(
+            EOS, OMG, premium_rate=premium_rate
+        ):
+            self.do_transition(EOS, OMG)
+            return
+        if self.should_convert2target(
+            OMG, EOS, premium_rate=premium_rate
+        ):
+            self.do_transition(OMG, EOS)
+            return
+
+
+    def do_transition(self, source, target):
+        price = Exchange.get_ntl_min_price(source)
+        ntl_got = Exchange.buy(self.assets[source], source)
+        if ntl_got is None:
+            return
+        self.assets[NTL] += ntl_got
+        self.assets[source] -= price * ntl_got
+        num_target_got = Exchange.redeem(self.assets[NTL], target)
+        self.assets[NTL] = D('0')
+        self.assets[target] += num_target_got
