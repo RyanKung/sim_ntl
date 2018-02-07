@@ -53,13 +53,12 @@ class Trader:
     A trader that always wants more flat-money.
     """
 
-    def __init__(self, num_eos, num_omg, premium_rate=0.05):
+    def __init__(self, num_eos, num_omg):
         self.assets = {
             EOS: num_eos,
             OMG: num_omg,
             NTL: D('0'),
         }
-        self.premium_rate = premium_rate
 
     @staticmethod
     def get_price_with_impact_cost(min_price, premium_rate):
