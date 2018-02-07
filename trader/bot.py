@@ -53,10 +53,10 @@ class Trader:
     A trader that always wants more flat-money.
     """
 
-    def __init__(self, premium_rate=0.05):
+    def __init__(self, num_eos, num_omg, premium_rate=0.05):
         self.assets = {
-            EOS: D('1000') * D('10'),
-            OMG: D('1000') * D('10'),
+            EOS: num_eos,
+            OMG: num_omg,
             NTL: D('0'),
         }
         self.premium_rate = premium_rate
@@ -127,7 +127,7 @@ class Trader:
 
 
 def main():
-    trader = Trader()
+    trader = Trader(D('1000') * D('10'), D('1000') * D('10'))
     while True:
         Exchange.update_kline()
         trader.one_cycle()

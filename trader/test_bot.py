@@ -1,3 +1,5 @@
+from decimal import Decimal as D
+
 import pytest
 import mock
 
@@ -21,7 +23,7 @@ import bot
 def test_should_redeem_target_token(
         eos_flat, eos_ntl, omg_flat, omg_ntl, premium_rate, result,
 ):
-    trader = bot.Trader()
+    trader = bot.Trader(D('1000') * D('10'), D('1000') * D('10'))
     exchange = bot.Exchange
 
     def get_flat_price(token_name):
