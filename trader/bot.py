@@ -9,6 +9,12 @@ NTL = 'ntl'
 
 
 class Exchange:
+    num_ntl_each_round = D('1000')
+
+    @classmethod
+    def update_kline(cls):
+        # update all data
+        pass
 
     @classmethod
     def get_flat_price(cls, token_name):
@@ -34,8 +40,12 @@ class Exchange:
         :param num_token: 10
         :param token: for example EOS
         """
-        num_bought = D('1000')
+        num_bought = cls.num_ntl_each_round
         return num_bought
+
+    @classmethod
+    def get_ntl_each_round(cls):
+        return cls.num_ntl_each_round
 
 
 class Trader:
@@ -57,7 +67,7 @@ class Trader:
 
     @staticmethod
     def get_premium_rate():
-        return D(random.randint(1, 100)) / D('100')
+        return D(random.randint(1, 20)) / D('100')
 
     def get_ntl_relative_price(
             self, source_token_name, target_token_name, premium_rate=None
@@ -71,12 +81,6 @@ class Trader:
         return target_ntl_price / source_ntl_price
 
     def get_token_relative_price(self, source_token_name, target_token_name):
-        """
-        If > 1， source
-        :param source_token_name:
-        :param target_token_name:
-        :return:
-        """
         source_market_price = Exchange.get_flat_price(source_token_name)
         target_market_price = Exchange.get_flat_price(target_token_name)
         return target_market_price / source_market_price
@@ -93,7 +97,6 @@ class Trader:
     def one_cycle(self):
         """
         Should be run each round.
-        :return:
         """
         premium_rate = self.get_premium_rate()
         if self.should_convert2target(
@@ -110,11 +113,22 @@ class Trader:
 
     def do_transition(self, source, target):
         price = Exchange.get_ntl_min_price(source)
-        ntl_got = Exchange.buy(self.assets[source], source)
+        source_cost = price * Exchange.get_ntl_each_round()
+        if self.assets[source] < source_cost:
+            return
+        ntl_got = Exchange.buy(source_cost, source)
         if ntl_got is None:
             return
         self.assets[NTL] += ntl_got
-        self.assets[source] -= price * ntl_got
+        self.assets[source] -= source_cost
         num_target_got = Exchange.redeem(self.assets[NTL], target)
         self.assets[NTL] = D('0')
         self.assets[target] += num_target_got
+
+
+def main():
+    trader = Trader()
+    while True:
+        Exchange.update_kline()
+        trader.one_cycle()
+        print(trader.assets)
