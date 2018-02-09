@@ -88,7 +88,7 @@ class Component:
     def auction(self, sender: str, bid: int) -> bool:
         return self.verify_bid(bid) and self.update_auction(bid, sender)
 
-    def redeem(self, sender: int, quantity: int) -> int:
+    def redeem(self, sender: str, quantity: int) -> int:
         redeemed = (self.min_bid / 1000 - quantity) * quantity / 2
         if not redeemed <= self.reserve:
             return False
