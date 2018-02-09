@@ -1,47 +1,96 @@
+from collections import defaultdict
 from decimal import Decimal as D
 
 import random
 
+import pandas as pd
+import time
 
-EOS = 'eos'
-OMG = 'omg'
-NTL = 'ntl'
+from sim.netrual import Component
+
+
+EOS = 'EOS'
+OMG = 'OMG'
+NTL = 'NTL'
+
+
+def read_csv(name, type='5m'):
+    return pd.read_csv(
+    './csv/binance_%s_%s_kline.csv' %(name, type),
+    names=[name, 'open', 'high', 'low', 'last', 'type', 'timestamp']
+)
+
+
+def get_usdt_price_pandas(target_symbol):
+    target2eth = read_csv('%s_ETH' % target_symbol)
+    eth2usdt = read_csv('ETH_USDT')
+    target2eth2usdt = pd.merge(target2eth, eth2usdt, on='timestamp')
+    target2eth2usdt['price_usdt'] = target2eth2usdt['last_x'] * target2eth2usdt['last_y']
+    return target2eth2usdt
 
 
 class Exchange:
     num_ntl_each_round = D('1000')
 
-    @classmethod
-    def update_kline(cls):
-        # update all data
-        pass
+    def __init__(self, symbols):
+        """
+        :type components: dict[str, sim.netrual.Component]
+        """
+        self.current_index = 0
+        self.symbols = symbols
+        self.prices = {}
+        self.components = {}
+        self.current_prices = defaultdict(lambda : D('0'))
+        for symbol in symbols:
+            self.components[symbol] = Component(symbol)
+            self.prices[symbol] = get_usdt_price_pandas(symbol)
 
-    @classmethod
-    def get_flat_price(cls, token_name):
-        return 1
+    def update_kline(self):
+        for symbol in self.symbols:
+            component = self.components[symbol]
+            prices = self.prices[symbol]
+            ts = prices['timestamp'][self.current_index]
+            component(ts)
+            self.current_prices[symbol] = D(
+                prices['price_usdt'][self.current_index]
+            )
+        self.current_index += 1
 
-    @classmethod
-    def get_ntl_min_price(cls, token_name):
-        return 1
+    def bootstrap(self):
+        self.update_kline()
+        for component in self.components.values():
+            component.auction('the-god', 1000)
 
-    @classmethod
-    def redeem(cls, num_ntl, token_name):
+    def get_flat_price(self, symbol):
+        return self.current_prices[symbol]
+
+    def get_ntl_min_price(self, token_name):
+        component = self.components[token_name]
+        return component.min_bid
+
+    def redeem(self, num_ntl, symbol, sender_name):
         """
         return token.
         """
-        num_redeemed = D(0)
+        component = self.components[symbol]
+        num_redeemed = component.redeem(sender_name, num_ntl)
+        if num_redeemed is False:
+            return None
         return num_redeemed
 
-    @classmethod
-    def buy(cls, num_token, token):
+    def buy(self, num_token, symbol, sender_name):
         """
         To buy given number of NTL buy token.
         Return num_amount of ntl if succeed, None if failed
         :param num_token: 10
-        :param token: for example EOS
+        :param symbol: for example EOS
+        :param sender_name: trader_name
         """
-        num_bought = cls.num_ntl_each_round
-        return num_bought
+        component = self.components[symbol]
+        result = component.auction(sender_name, num_token)
+        if result:
+            return self.num_ntl_each_round
+        return None
 
     @classmethod
     def get_ntl_each_round(cls):
@@ -52,13 +101,18 @@ class Trader:
     """
     A trader that always wants more flat-money.
     """
+    name = 'greed-is-good'
 
-    def __init__(self, num_eos, num_omg):
+    def __init__(self, num_eos, num_omg, exchange):
+        """
+        :type exchange: Exchange
+        """
         self.assets = {
             EOS: num_eos,
             OMG: num_omg,
             NTL: D('0'),
         }
+        self.exchange = exchange
 
     @staticmethod
     def get_price_with_impact_cost(min_price, premium_rate):
@@ -71,8 +125,8 @@ class Trader:
     def get_ntl_relative_price(
             self, source_token_name, target_token_name, premium_rate=None
     ):
-        source_ntl_price = Exchange.get_ntl_min_price(source_token_name)
-        target_ntl_price = Exchange.get_ntl_min_price(target_token_name)
+        source_ntl_price = self.exchange.get_ntl_min_price(source_token_name)
+        target_ntl_price = self.exchange.get_ntl_min_price(target_token_name)
         if premium_rate is not None:
             target_ntl_price = self.get_price_with_impact_cost(
                 target_ntl_price, premium_rate=premium_rate
@@ -80,8 +134,8 @@ class Trader:
         return target_ntl_price / source_ntl_price
 
     def get_token_relative_price(self, source_token_name, target_token_name):
-        source_market_price = Exchange.get_flat_price(source_token_name)
-        target_market_price = Exchange.get_flat_price(target_token_name)
+        source_market_price = self.exchange.get_flat_price(source_token_name)
+        target_market_price = self.exchange.get_flat_price(target_token_name)
         return target_market_price / source_market_price
 
     def should_convert2target(self, source_token, target_token, premium_rate=None):
@@ -109,25 +163,36 @@ class Trader:
             self.do_transition(OMG, EOS)
             return
 
-
     def do_transition(self, source, target):
-        price = Exchange.get_ntl_min_price(source)
-        source_cost = price * Exchange.get_ntl_each_round()
+        price = self.exchange.get_ntl_min_price(source)
+        source_cost = price * self.exchange.get_ntl_each_round()
         if self.assets[source] < source_cost:
             return
-        ntl_got = Exchange.buy(source_cost, source)
+        ntl_got = self.exchange.buy(source_cost, source, self.name)
         if ntl_got is None:
             return
         self.assets[NTL] += ntl_got
         self.assets[source] -= source_cost
-        num_target_got = Exchange.redeem(self.assets[NTL], target)
+        num_target_got = self.exchange.redeem(
+            self.assets[NTL],
+            target,
+            self.name
+        )
         self.assets[NTL] = D('0')
         self.assets[target] += num_target_got
 
 
 def main():
-    trader = Trader(D('1000') * D('10'), D('1000') * D('10'))
+    exchange = Exchange(['EOS', 'OMG'])
+    trader = Trader(
+        D('1000') * D('10'), D('1000') * D('10'),
+        exchange,
+    )
+    exchange.bootstrap()
     while True:
-        Exchange.update_kline()
+        exchange.update_kline()
         trader.one_cycle()
         print(trader.assets)
+        time.sleep(1)
+
+main()
