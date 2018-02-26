@@ -1,7 +1,7 @@
 NLT_accounts = {}
 NLT_reserve = {}
 NLT_components = {}
-NLT_AUCTION_WINDOW = 600
+NLT_AUCTION_WINDOW = 3600
 NLT_REWARD = 1000
 
 
