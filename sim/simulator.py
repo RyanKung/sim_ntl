@@ -1,9 +1,9 @@
 import random
 from pandas import DataFrame
 
-from .netrual import Component, NLT_reserve, NLT_components  # noqa
+from .netrual import Component, NLT_reserve, NLT_components, NLT_REWARD # noqa
 from .utils import redeem_strategy, auction_strategy, nlt_price, nlt_price_2
-from .utils import determin_auction_quantity, determin_redeem_quantity, get_worth_to_redeem
+from .utils import determin_auction_quantity, determin_redeem_quantity
 
 
 def warmup(start_timestamp, sender):
@@ -16,7 +16,7 @@ def warmup(start_timestamp, sender):
 def rational_warmup(start_timestamp, market_price, sender):
     begin = start_timestamp - Component.auction_window - 1
     for c in NLT_components.values():
-        res = c(begin).auction(sender, (15 / float(market_price[c.token])) * 1000)
+        res = c(begin).auction(sender, (15 / float(market_price[c.token])) * NLT_REWARD)
         print(res)
 
 

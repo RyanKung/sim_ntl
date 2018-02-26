@@ -1,7 +1,8 @@
 NLT_accounts = {}
 NLT_reserve = {}
 NLT_components = {}
-NLT_AUCTION_WINDOW = 3600
+NLT_AUCTION_WINDOW = 600
+NLT_REWARD = 1000
 
 
 class Component:
@@ -10,9 +11,8 @@ class Component:
     auction_window = NLT_AUCTION_WINDOW
     last_cycle = -1
     start_timestamp = -1
-    current_cycle = 0
 
-    def __init__(self, token, inital_reserve=10000):
+    def __init__(self, token):
         self.minted = {}
         NLT_reserve[token] = float(0)
         self.token = token
@@ -20,14 +20,14 @@ class Component:
         self.components = NLT_components
         self.components[token] = self
         self.accounts = NLT_accounts
-        self.reserves[self.token] = inital_reserve
+        self.current_cycle = 0
 
     def __call__(self, timestamp: float):
-        self.timestamp = timestamp
+        self.timestamp = int(str(int(timestamp))[:10])
         if self.start_timestamp == -1:
             self.start_timestamp = timestamp
         if self.cycle > self.current_cycle:
-            print('%s:: New cycle %s' % (self.token, self.cycle))
+            print('%s:: New cycle %s <- %s' % (self.token, self.cycle, self.current_cycle))
             self.update_status()
         return self
 
@@ -51,8 +51,11 @@ class Component:
         return self.minted.get(self.last_cycle)
 
     def get_redeem_amount(self, quantity):
-        assert quantity % 1000 == 0
-        return sum([v['bid'] for v in self.minted.values()][-(int(quantity / 1000)):])
+        assert quantity % NLT_REWARD == 0
+        ret = sum([v['bid'] for v in self.minted.values()][-(int(quantity / NLT_REWARD) + 1):])
+        if ret > self.reserve:
+            return 0
+        return ret
 
     def get_cycle(self, winner: str) -> list:
         return [
@@ -93,7 +96,7 @@ class Component:
     def record_minted(self):
         if self.last_minted:
             print('Found last Winner')
-            self.send_token(self.last_minted['sender'], 1000)
+            self.send_token(self.last_minted['sender'], NLT_REWARD)
             self.reserve = self.reserve + self.last_minted['bid']
             self.min_bid = self.last_minted['bid']
 
@@ -129,22 +132,25 @@ class Component:
     def redeem_all(self, sender) -> float:
         return self.redeem(sender, self.balance(sender))
 
-    def redeem_1000(self, sender):
-        print('redeeming 1000 for %s, reserve is %s' % (self.token, self.reserve))
+    def redeem_unit(self, sender):
+        print('redeeming NLT_REWARD for %s, reserve is %s' % (self.token, self.reserve))
         redeemed = self.min_bid
-        assert redeemed <= self.reserve
+        if redeemed > self.reserve:
+            return 0
+
         self.reserve = self.reserve - redeemed
-        if self.burn_token(sender, 1000):
+        if self.burn_token(sender, NLT_REWARD):
             if len(self.minted) > 1:
                 self.min_bid = list(self.minted.values())[-2]['bid']
+                del self.minted[list(self.minted.keys())[-1]]
             else:
                 self.min_bid = 1  # set to the inital value
-            del self.minted[list(self.minted.keys())[-1]]
             return redeemed
         else:
-            raise Exception('out of balance', self.balance(sender))
+            print('out of balance', self.balance(sender))
+            return 0
 
     def redeem(self, sender: str, quantity: float) -> float:
-        assert quantity % 1000 == 0
-        for _ in range(0, int(quantity / 1000)):
-            yield self.redeem_1000(sender)
+        assert quantity % NLT_REWARD == 0
+        for _ in range(0, int(quantity / NLT_REWARD)):
+            yield self.redeem_unit(sender)

@@ -3,7 +3,7 @@ import pandas as pd
 
 def read_csv(name, type='5m'):
     return pd.read_csv(
-        './csv/binance_%s_%s_kline.csv' % (name, type),
+        './history/binance_%s_%s_kline.csv' % (name, type),
         names=[name, 'open', 'high', 'low', 'last', 'type', 'timestamp']
     )
 
@@ -33,3 +33,7 @@ def get_batch_price(tokens, eth_usdt=None):
     )
     # https://stackoverflow.com/questions/32041245/fast-method-for-removing-duplicate-columns-in-pandas-dataframe
     return df.loc[:, ~df.columns.duplicated()].dropna(how='any')
+
+
+def format_ts(s):
+    return int(str(int(s))[:10])
