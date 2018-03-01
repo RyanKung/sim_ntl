@@ -33,7 +33,8 @@ def get_profit_pair(market_prices, threshold=0.001):
 
 def exchange(market_prices, ts, sender):
     pair = get_profit_pair(market_prices)
-    assert pair['from'](ts).auction(sender, pair['from'].min_bid * pair['rate'])
+    assert pair['from'](ts).auction(
+        sender, pair['from'].min_bid * pair['rate'])
     pair['to'](ts).redeem(sender, NLT_REWARD)
 
 
@@ -45,6 +46,13 @@ def nlt_price_2(market_price: dict):
 def nlt_price(market_price: dict):
     h = highest(market_price)[0]
     return (market_price[h] * NLT_components[h].min_bid) / NLT_REWARD
+
+
+def nlt_fm_price(market_price: dict):
+    if 'timestamp' in market_price:
+        market_price = market_price.drop('timestamp')
+    total_supply = list(NLT_components.values())[0].total_supply
+    return sum([NLT_components[t].reserve * p for t, p in market_price.items()]) / total_supply
 
 
 def profit_rate(p_c, p_nlt, min_bid):
@@ -94,7 +102,8 @@ def determin_auction_quantity(market_price: dict, price_model=nlt_price, thresho
     price = price_model(market_price)
 
     planned = {
-        k: NLT_components[k].min_bid / profit_rate(v['price'], price, NLT_components[k].min_bid)
+        k: NLT_components[k].min_bid /
+        profit_rate(v['price'], price, NLT_components[k].min_bid)
         for k, v
         in get_worth_to_auction(market_price, threshold=threshold).items()
     }
@@ -102,7 +111,13 @@ def determin_auction_quantity(market_price: dict, price_model=nlt_price, thresho
         k: v
         for k, v
         in planned.items()
-        if v >= NLT_components[k].min_bid
+    }
+
+
+def get_redeem_price(market_price: dict, amount=1000):
+    return {
+        t: NLT_components[t].get_redeem_price(1000)
+        for t, p in market_price.items()
     }
 
 
@@ -110,14 +125,11 @@ def determin_redeem_quantity(market_price: dict, price_model=nlt_price, threshol
     price = price_model(market_price)
 
     def quantity(token, t_price, n_price):
-        q = NLT_REWARD
-        if NLT_components[token].get_redeem_amount(q) == 0:
-            return 0
-
+        q = 0
         while (NLT_components[token].get_redeem_amount(q + NLT_REWARD) * t_price) / (n_price * (q + NLT_REWARD)) > 1 + threshold:
+            if NLT_components[token].get_redeem_amount(q + NLT_REWARD) > NLT_components[token].reserve:
+                return q
             q += NLT_REWARD
-        if q > NLT_components[token].reserve:
-            return 0
         return q
 
     planned = {
@@ -148,7 +160,7 @@ def redeem(token, market_price, sender, rate=0.002):
 
 def redeem_strategy(plan: dict, sender: str, ts: int):
     return {
-        'redeemed %s' % t: list(NLT_components[t](ts).redeem(sender, q))
+        'redeemed %s' % t: NLT_components[t](ts).redeem(sender, q)
         for t, q in plan.items()
     }
 

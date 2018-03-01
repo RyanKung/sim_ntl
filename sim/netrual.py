@@ -21,13 +21,15 @@ class Component:
         self.components[token] = self
         self.accounts = NLT_accounts
         self.current_cycle = 0
+        self.supply = 0
 
     def __call__(self, timestamp: float):
         self.timestamp = int(str(int(timestamp))[:10])
         if self.start_timestamp == -1:
             self.start_timestamp = timestamp
         if self.cycle > self.current_cycle:
-            print('%s:: New cycle %s <- %s' % (self.token, self.cycle, self.current_cycle))
+            print('%s:: New cycle %s <- %s' %
+                  (self.token, self.cycle, self.current_cycle))
             self.update_status()
         return self
 
@@ -50,12 +52,23 @@ class Component:
     def last_minted(self):
         return self.minted.get(self.last_cycle)
 
-    def get_redeem_amount(self, quantity):
-        assert quantity % NLT_REWARD == 0
-        ret = sum([v['bid'] for v in self.minted.values()][-(int(quantity / NLT_REWARD) + 1):])
-        if ret > self.reserve:
+    def fair_price(self):
+        if len(self.minted) * self.supply == 0:
             return 0
-        return ret
+        return self.reserve / (len(self.minted) * self.supply)
+
+    def get_redeem_price(self, quantity, q=-0.05):
+        assert quantity % NLT_REWARD == 0
+        t = quantity / NLT_REWARD
+
+        fair_price = self.fair_price()
+        res = fair_price * ((1 - q ** t) / (1 - q))
+        if res > self.reserve:
+            return 0
+        return res
+
+    def get_redeem_amount(self, quantity, q=-0.05):
+        return quantity * self.get_redeem_price(quantity, q)
 
     def get_cycle(self, winner: str) -> list:
         return [
@@ -71,8 +84,8 @@ class Component:
             self.accounts[sender] = amount
         else:
             self.accounts[sender] += amount
-        print('Current balance %s' % self.accounts)
 
+        self.supply += amount
         return False
 
     def burn_token(self, sender, amount) -> bool:
@@ -82,6 +95,7 @@ class Component:
             return False
         else:
             self.accounts[sender] -= amount
+            self.supply -= amount
             return True
 
     def update_status(self):
@@ -129,28 +143,14 @@ class Component:
         ret = self.verify_bid(bid) and self.update_auction(bid, sender)
         return ret
 
-    def redeem_all(self, sender) -> float:
-        return self.redeem(sender, self.balance(sender))
+    def redeem(self, sender: str, quantity: float) -> float:
+        redeem_price = self.get_redeem_price(quantity)
+        redeemed = quantity * redeem_price
 
-    def redeem_unit(self, sender):
-        print('redeeming NLT_REWARD for %s, reserve is %s' % (self.token, self.reserve))
-        redeemed = self.min_bid
-        if redeemed > self.reserve:
-            return 0
-
-        self.reserve = self.reserve - redeemed
-        if self.burn_token(sender, NLT_REWARD):
-            if len(self.minted) > 1:
-                self.min_bid = list(self.minted.values())[-2]['bid']
-                del self.minted[list(self.minted.keys())[-1]]
-            else:
-                self.min_bid = 1  # set to the inital value
+        if self.burn_token(sender, quantity):
+            self.reserve = self.reserve - redeemed
+            self.min_bid = redeem_price * 1000  # redeem price
             return redeemed
         else:
             print('out of balance', self.balance(sender))
             return 0
-
-    def redeem(self, sender: str, quantity: float) -> float:
-        assert quantity % NLT_REWARD == 0
-        for _ in range(0, int(quantity / NLT_REWARD)):
-            yield self.redeem_unit(sender)

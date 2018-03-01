@@ -2,10 +2,12 @@ import pandas as pd
 
 
 def read_csv(name, type='5m'):
-    return pd.read_csv(
+    res = pd.read_csv(
         './history/binance_%s_%s_kline.csv' % (name, type),
         names=[name, 'open', 'high', 'low', 'last', 'type', 'timestamp']
     )
+    res['timestamp'] = res['timestamp'].map(format_ts)
+    return res
 
 
 def get_price(token, eth_usdt=None):  # None for cache able
