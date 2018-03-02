@@ -102,8 +102,7 @@ def determin_auction_quantity(market_price: dict, price_model=nlt_price, thresho
     price = price_model(market_price)
 
     planned = {
-        k: NLT_components[k].min_bid /
-        profit_rate(v['price'], price, NLT_components[k].min_bid)
+        k: NLT_REWARD * price / v['price']
         for k, v
         in get_worth_to_auction(market_price, threshold=threshold).items()
     }

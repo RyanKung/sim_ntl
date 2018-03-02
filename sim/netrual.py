@@ -57,7 +57,7 @@ class Component:
             return 0
         return self.reserve / (len(self.minted) * self.supply)
 
-    def get_redeem_price(self, quantity, q=-0.05):
+    def get_redeem_price(self, quantity, q=-0.005):
         assert quantity % NLT_REWARD == 0
         t = quantity / NLT_REWARD
 
@@ -67,7 +67,7 @@ class Component:
             return 0
         return res
 
-    def get_redeem_amount(self, quantity, q=-0.05):
+    def get_redeem_amount(self, quantity, q=-0.005):
         return quantity * self.get_redeem_price(quantity, q)
 
     def get_cycle(self, winner: str) -> list:
